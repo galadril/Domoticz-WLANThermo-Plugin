@@ -21,6 +21,8 @@
     </description>
     <params>
         <param field="Address" label="IP Address" width="200px" required="true" default="0.0.0.0"/>
+        <param field="Username" label="Username" width="200px" required="false" default="admin"/>
+        <param field="Password" label="Password" width="200px" required="false" default="admin"/>
         <param field="Mode6" label="Debug" width="200px">
             <options>
                 <option label="None" value="0"  default="true" />
@@ -106,11 +108,15 @@ class BasePlugin:
         return True
 
     def onCommand(self, Unit, Command, Level, Hue):
-        Domoticz.Log("onCommand called for Unit " + str(Unit) + ": Parameter '" + str(Command) + "', Level: " + str(Level) + ", Connected: " + str(self.WLANThermoConn.Connected()))
+        Domoticz.Log("onCommand - Called for Unit " + str(Unit) + ": Parameter '" + str(Command) + "', Level: " + str(Level) + ", Connected: " + str(self.WLANThermoConn.Connected()))
 
         Command = Command.strip()
         action, sep, params = Command.partition(' ')
         action = action.capitalize()
+            
+        credentials = ('%s:%s' % (Parameters["Username"], Parameters["Password"]))
+        encoded_credentials = base64.b64encode(credentials.encode('ascii'))
+        basicAuth = 'Basic %s' % encoded_credentials.decode("ascii")
         
         setMax = True
         channel = Unit
@@ -120,7 +126,19 @@ class BasePlugin:
             if Unit > 100:
                 channel = Unit - 100
                 setMax = False
-                
+        
+        postData = '{"number": ' + str(channel) + ', "min": ' + str(Level) + '}'
+        if setMax:
+            postData = '{"number": ' + str(channel) + ', "max": ' + str(Level) + '}'
+        Domoticz.Log("onCommand - Post data: " + str(postData))
+        
+        self.sendAfterConnect = { 'Verb' : 'POST', 'URL'  : '/setchannels', 'Headers' : {'Authorization': basicAuth, "Accept": "Content-Type: application/json; charset=UTF-8"}, 'Data': postData}
+        if (self.WLANThermoConn.Connected() == False):
+            Domoticz.Log("onCommand - WLANThermoConn Reconnecting... ")
+            self.WLANThermoConn.Connect()
+        else:
+            Domoticz.Log("onCommand - Still connected to WLANThermo")
+            self.WLANThermoConn.Send(self.sendAfterConnect)
         return True
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
