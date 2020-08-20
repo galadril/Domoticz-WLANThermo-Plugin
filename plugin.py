@@ -85,8 +85,8 @@ class BasePlugin:
                 Domoticz.Log("Receive new temperature for channel: " + str(channel['name']) + " | " +  str(channel['temp']) )
                 
                 unitId = int(channel['number'])
-                unitIdMin = int(channel['number'])+10
-                unitIdMax = int(channel['number'])+100
+                unitIdMin = int(channel['number'])+100
+                unitIdMax = int(channel['number'])+200
                 
                 temp = int(channel['temp'])
                 min = int(channel['min'])
@@ -95,9 +95,9 @@ class BasePlugin:
                 if unitId not in Devices:
                     Domoticz.Device(Name=channel['name'], Unit=unitId, TypeName="Temperature").Create()
                 if unitIdMin not in Devices:
-                    Domoticz.Device(Name=channel['name']+ " Min", Unit=unitIdMin, Type=242, Subtype=1).Create()
+                    Domoticz.Device(Name=channel['name']+ " - Min SetPoint", Unit=unitIdMin, Type=242, Subtype=1).Create()
                 if unitIdMax not in Devices:
-                    Domoticz.Device(Name=channel['name']+ " Max", Unit=unitIdMax, Type=242, Subtype=1).Create()
+                    Domoticz.Device(Name=channel['name']+ " - Max SetPoint", Unit=unitIdMax, Type=242, Subtype=1).Create()
                 
                 UpdateDevice(unitId, temp, str(temp), TimedOut=0)
                 UpdateDevice(unitIdMin, min, str(min), TimedOut=0)
@@ -107,7 +107,20 @@ class BasePlugin:
 
     def onCommand(self, Unit, Command, Level, Hue):
         Domoticz.Log("onCommand called for Unit " + str(Unit) + ": Parameter '" + str(Command) + "', Level: " + str(Level) + ", Connected: " + str(self.WLANThermoConn.Connected()))
-       
+
+        Command = Command.strip()
+        action, sep, params = Command.partition(' ')
+        action = action.capitalize()
+        
+        setMax = True
+        channel = Unit
+        if Unit > 200:
+            channel = Unit - 200
+        else:
+            if Unit > 100:
+                channel = Unit - 100
+                setMax = False
+                
         return True
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
