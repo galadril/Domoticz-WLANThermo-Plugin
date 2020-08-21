@@ -41,6 +41,7 @@ import Domoticz
 import sys
 import json
 import base64
+import requests
 
 class BasePlugin:
     WLANThermoConn = None
@@ -90,9 +91,9 @@ class BasePlugin:
                 unitIdMin = int(channel['number'])+100
                 unitIdMax = int(channel['number'])+200
                 
-                temp = int(channel['temp'])
-                min = int(channel['min'])
-                max = int(channel['max'])
+                temp = channel['temp']
+                min = channel['min']
+                max = channel['max']
                 
                 if unitId not in Devices:
                     Domoticz.Device(Name=channel['name'], Unit=unitId, TypeName="Temperature").Create()
@@ -101,10 +102,11 @@ class BasePlugin:
                 if unitIdMax not in Devices:
                     Domoticz.Device(Name=channel['name']+ " - Max SetPoint", Unit=unitIdMax, Type=242, Subtype=1).Create()
                 
-                UpdateDevice(unitId, temp, str(temp), TimedOut=0)
-                UpdateDevice(unitIdMin, min, str(min), TimedOut=0)
-                UpdateDevice(unitIdMax, max, str(max), TimedOut=0)
-            
+                UpdateTemperatureDevice(unitId, str(temp), TimedOut=0)
+                UpdateTemperatureDevice(unitIdMin, str(min), TimedOut=0)
+                UpdateTemperatureDevice(unitIdMax, str(max), TimedOut=0)
+                
+        self.WLANThermoConn.Disconnect()
         return True
 
     def onCommand(self, Unit, Command, Level, Hue):
@@ -127,18 +129,14 @@ class BasePlugin:
                 channel = Unit - 100
                 setMax = False
         
-        postData = '{"number": ' + str(channel) + ', "min": ' + str(Level) + '}'
+        url = "http://" + Parameters["Address"] + "/setchannels"
+        data = {"number": channel, "min": Level}
         if setMax:
-            postData = '{"number": ' + str(channel) + ', "max": ' + str(Level) + '}'
-        Domoticz.Log("onCommand - Post data: " + str(postData))
-        
-        self.sendAfterConnect = { 'Verb' : 'POST', 'URL'  : '/setchannels', 'Headers' : {'Authorization': basicAuth, "Accept": "Content-Type: application/json; charset=UTF-8"}, 'Data': postData}
-        if (self.WLANThermoConn.Connected() == False):
-            Domoticz.Log("onCommand - WLANThermoConn Reconnecting... ")
-            self.WLANThermoConn.Connect()
-        else:
-            Domoticz.Log("onCommand - Still connected to WLANThermo")
-            self.WLANThermoConn.Send(self.sendAfterConnect)
+            data = {"number": channel, "max": Level}
+        Domoticz.Log("onCommand - Post data: " + str(data) + " | to url: " + url)
+        headers = {'Authorization': basicAuth, 'Content-type': 'application/json', 'Accept': 'text/plain'}
+        r = requests.post(url, data=json.dumps(data), headers=headers)
+        self.WLANThermoConn.Connect()
         return True
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
@@ -147,21 +145,7 @@ class BasePlugin:
 
     def onHeartbeat(self):
         try:
-            if (self.WLANThermoConn.Connected()):
-                if (self.outstandingPings > 3):
-                    self.WLANThermoConn.Disconnect()
-                    self.nextConnect = 0
-                else:
-                    self.WLANThermoConn.Send(self.sendData)
-                    self.outstandingPings = self.outstandingPings + 1
-            else:
-                # if not connected try and reconnected every 3 heartbeats
-                self.outstandingPings = 0
-                self.nextConnect = self.nextConnect - 1
-                self.sendAfterConnect = self.sendData
-                if (self.nextConnect <= 0):
-                    self.nextConnect = 1
-                    self.WLANThermoConn.Connect()
+            self.WLANThermoConn.Connect()
             return True
         except:
             Domoticz.Log("Unhandled exception in onHeartbeat, forcing disconnect.")
@@ -255,6 +239,14 @@ def DumpJSONResponseToLog(jsonDict):
                     Domoticz.Log("------->'" + y + "':'" + str(jsonDict[x][y]) + "'")
             else:
                 Domoticz.Log("--->'" + x + "':'" + str(jsonDict[x]) + "'")
+
+def UpdateTemperatureDevice(Unit, sValue, TimedOut):
+    # Make sure that the Domoticz device still exists (they can be deleted) before updating it 
+    if (Unit in Devices):
+        if (Devices[Unit].sValue != sValue) or (Devices[Unit].TimedOut != TimedOut):
+            Devices[Unit].Update(nValue=0, sValue=str(sValue), TimedOut=TimedOut)
+            Domoticz.Log("Update:'"+str(sValue)+"' ("+Devices[Unit].Name+")")
+    return
 
 def UpdateDevice(Unit, nValue, sValue, TimedOut):
     # Make sure that the Domoticz device still exists (they can be deleted) before updating it 
