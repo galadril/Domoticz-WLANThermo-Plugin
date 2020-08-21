@@ -11,12 +11,15 @@ Get the channel temperatures within Domoticz and be able to set the min and max 
 Your also able to see the Pitmaster fan speed, and mode (off/manual/auto)
 
 All devices: 
+
 ![devices](https://user-images.githubusercontent.com/14561640/90876028-46c8e700-e3a2-11ea-8bcb-40f90ff946f1.png)
 
 Setting a min or max value on a channel: 
+
 ![setpoint](https://user-images.githubusercontent.com/14561640/90861102-820beb80-e38b-11ea-9784-d81cbea52e01.png)
 
 Set the pitmaster mode: 
+
 ![pitmaster](https://user-images.githubusercontent.com/14561640/90875997-3add2500-e3a2-11ea-9a8a-633bfb54e5d7.png)
 
 
