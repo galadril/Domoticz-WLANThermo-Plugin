@@ -2,7 +2,7 @@
 # Domoticz-WLANThermo-Plugin
 
 WLANThermo Plugin for Domoticz Home Automation
-This plugin allows to receive the channel temperatures from WLANThermo within Domoticz 
+This plugin allows integrate your WLANThermo device with Domoticz 
 
 
 ## Features
