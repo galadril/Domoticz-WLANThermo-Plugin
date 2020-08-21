@@ -3,7 +3,7 @@
 #           Author:     galadril, 2020
 #
 """
-<plugin key="WLANThermo" name="WLANThermo" author="galadril" version="0.0.1" wikilink="https://github.com/galadril/Domoticz-WLANThermo-Plugin" externallink="">
+<plugin key="WLANThermo" name="WLANThermo" author="galadril" version="0.0.2" wikilink="https://github.com/galadril/Domoticz-WLANThermo-Plugin" externallink="">
     <description>
         <h2>WLANThermo Plugin</h2><br/>
         <h3>Features</h3>
@@ -47,6 +47,8 @@ class BasePlugin:
     WLANThermoConn = None
     nextConnect = 1
     outstandingPings = 0
+    unitIdPitmaster = 200
+    pitmasterState = None
     
     sendData = { 'Verb' : 'GET', 'URL'  : '/data'}
     sendAfterConnect = { 'Verb' : 'GET', 'URL'  : '/data'}
@@ -88,8 +90,8 @@ class BasePlugin:
                 Domoticz.Log("Receive new temperature for channel: " + str(channel['name']) + " | " +  str(channel['temp']) )
                 
                 unitId = int(channel['number'])
-                unitIdMin = int(channel['number'])+100
-                unitIdMax = int(channel['number'])+200
+                unitIdMin = int(channel['number'])+50
+                unitIdMax = int(channel['number'])+100
                 
                 temp = channel['temp']
                 min = channel['min']
@@ -106,7 +108,25 @@ class BasePlugin:
                 UpdateTemperatureDevice(unitIdMin, str(min), TimedOut=0)
                 UpdateTemperatureDevice(unitIdMax, str(max), TimedOut=0)
                 
-        self.WLANThermoConn.Disconnect()
+        pitValue = Response["pitmaster"]["pm"][0]["value"]
+        pitType = Response["pitmaster"]["pm"][0]["typ"]
+        pitId = Response["pitmaster"]["pm"][0]["id"]
+        self.pitmasterState = Response["pitmaster"]["pm"]
+        
+        if 249 not in Devices:
+            Domoticz.Device(Name="Pitmaster - Value", Unit=249, TypeName="Percentage").Create()
+        if (self.unitIdPitmaster+pitId) not in Devices:
+            Domoticz.Device(Name="Pitmaster - Mode",  Unit=self.unitIdPitmaster+pitId, TypeName="Selector Switch", Options={"LevelActions": "0|10|20", "LevelNames": "Off|Manual|Auto", "LevelOffHidden": "false"}).Create()
+
+        Domoticz.Log("Receive new pitmaster values: " + str(pitValue) + " | " +  pitType)
+        UpdateDevice(249, pitValue, str(pitValue), 0)
+        
+        if (pitType == 'off'):
+            UpdateDevice(self.unitIdPitmaster+pitId, 0, 'Off', 0)
+        elif (pitType == 'manual'):
+            UpdateDevice(self.unitIdPitmaster+pitId, 10, 'Manual', 0)
+        else:
+            UpdateDevice(self.unitIdPitmaster+pitId, 20, 'Auto', 0)
         return True
 
     def onCommand(self, Unit, Command, Level, Hue):
@@ -122,21 +142,32 @@ class BasePlugin:
         
         setMax = True
         channel = Unit
-        if Unit > 200:
-            channel = Unit - 200
+        if Unit > 100:
+            channel = Unit - 100
         else:
-            if Unit > 100:
-                channel = Unit - 100
+            if Unit > 50:
+                channel = Unit - 50
                 setMax = False
         
-        url = "http://" + Parameters["Address"] + "/setchannels"
-        data = {"number": channel, "min": Level}
-        if setMax:
-            data = {"number": channel, "max": Level}
-        Domoticz.Log("onCommand - Post data: " + str(data) + " | to url: " + url)
-        headers = {'Authorization': basicAuth, 'Content-type': 'application/json', 'Accept': 'text/plain'}
-        r = requests.post(url, data=json.dumps(data), headers=headers)
-        self.WLANThermoConn.Connect()
+        if Unit < 200:
+            url = "http://" + Parameters["Address"] + "/setchannels"
+            data = {"number": channel, "min": Level}
+            if setMax:
+                data = {"number": channel, "max": Level}
+            Domoticz.Log("onCommand - Post data: " + str(data) + " | to url: " + url)
+            headers = {'Authorization': basicAuth, 'Content-type': 'application/json', 'Accept': 'text/plain'}
+            r = requests.post(url, data=json.dumps(data), headers=headers)
+        else:
+            mode = "off"
+            if (Level == 10):
+                mode = "manual"
+            elif (Level == 20):
+                mode = "auto"
+            url = "http://" + Parameters["Address"] + "/setpitmaster"
+            self.pitmasterState[0]["typ"] = mode
+            Domoticz.Log("onCommand - Post data: " + str(self.pitmasterState) + " | to url: " + url)
+            headers = {'Authorization': basicAuth, 'Content-type': 'application/json', 'Accept': 'text/plain'}
+            r = requests.post(url, data=json.dumps(self.pitmasterState), headers=headers)
         return True
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
@@ -145,12 +176,25 @@ class BasePlugin:
 
     def onHeartbeat(self):
         try:
-            self.WLANThermoConn.Connect()
+            if (self.WLANThermoConn.Connected()):
+                if (self.outstandingPings > 3):
+                    self.WLANThermoConn.Disconnect()
+                    self.nextConnect = 0
+                else:
+                    self.WLANThermoConn.Send(self.sendData)
+                    self.outstandingPings = self.outstandingPings + 1
+            else:
+                # if not connected try and reconnected every 3 heartbeats
+                self.outstandingPings = 0
+                self.nextConnect = self.nextConnect - 1
+                self.sendAfterConnect = self.sendData
+                if (self.nextConnect <= 0):
+                    self.nextConnect = 1
+                    self.WLANThermoConn.Connect()
             return True
         except:
             Domoticz.Log("Unhandled exception in onHeartbeat, forcing disconnect.")
             self.onDisconnect(self.WLANThermoConn)
-            self.WLANThermoConn = None
         
     def onDisconnect(self, Connection):
         Domoticz.Log("Device has disconnected")
