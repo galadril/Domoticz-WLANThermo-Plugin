@@ -5,6 +5,14 @@ WLANThermo Plugin for Domoticz Home Automation
 This plugin allows to receive the channel temperatures from WLANThermo within Domoticz 
 
 
+## Features
+
+Get the channel temperatures within Domoticz and be able to set the min and max temperature of your WLANThermo channel from Domoticz.
+
+![devices](https://user-images.githubusercontent.com/14561640/90861052-71f40c00-e38b-11ea-9c68-f2c76352d549.png) 
+![setpoint](https://user-images.githubusercontent.com/14561640/90861102-820beb80-e38b-11ea-9784-d81cbea52e01.png)
+
+
 ## Installation
 
 Python version 3.4 or higher required & Domoticz version 3.87xx or greater.
