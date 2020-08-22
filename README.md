@@ -23,6 +23,14 @@ Set the pitmaster mode:
 ![pitmaster](https://user-images.githubusercontent.com/14561640/90875997-3add2500-e3a2-11ea-9a8a-633bfb54e5d7.png)
 
 
+## Example
+
+![wlanthermo](https://user-images.githubusercontent.com/14561640/90962835-4d934f00-e4b3-11ea-9482-cc11e953e132.png) 
+
+![channel](https://user-images.githubusercontent.com/14561640/90962836-5126d600-e4b3-11ea-90a5-5a896d9d047f.png) 
+
+![pitmaster](https://user-images.githubusercontent.com/14561640/90962837-55eb8a00-e4b3-11ea-97bd-23f778cced5f.png) 
+
 
 ## Installation
 
